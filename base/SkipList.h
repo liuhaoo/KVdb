@@ -99,11 +99,11 @@ int SkipList<K,V>::insertElement(K k, V v){
     Node<K,V>* cur = _header;
 
     // track the parent of the inserted-Node 
-    Node<K,V>* update = new Node<K,V>[_maxLevel+1];
+    Node<K,V>** update = new Node<K,V>*[_maxLevel+1];
     for(int i = _curLevel; i >= 0; i--){
         while(cur->_forward[i] && cur->_forward[i]->getKey()<k)
             cur = cur->_forward[i];
-        update[i] = *cur;
+        update[i] = cur;
     }
 
     // the position of key
@@ -111,28 +111,29 @@ int SkipList<K,V>::insertElement(K k, V v){
 
     // the key is already in the skiplist, modify its value
     if(cur && cur->getKey()==k){
+        // std::cout<<"modify the Node key: "<<k<<", value: "<<v<<std::endl;
         cur->setValue(v);
         mtx.unlock();
         return 1;
     }
 
     // insert the new Node
-    if(cur==nullptr || cur->getKey()==k){
+    if(cur==nullptr || cur->getKey()!=k){
         int randomLevel = getRandomLevel();
         // the new Node's level is higher than _curLevel
         if(randomLevel > _curLevel){
             for(int i = _curLevel+1; i <= randomLevel; i++){
-                update[i] = *_header;
+                update[i] = _header;
             }
             _curLevel = randomLevel;
         }
         // insert
         Node<K,V>* insertNode = createNode(k,v,randomLevel);
         for(int i = 0; i <= randomLevel; i++){
-            insertNode->_forward[i] = update[i]._forward[i];
-            update[i]._forward[i] = insertNode;
+            insertNode->_forward[i] = update[i]->_forward[i];
+            update[i]->_forward[i] = insertNode;
         }
-        std::cout<<"Successfully inserted key: "<<k<<", value: "<<v<<std::endl;
+        // std::cout<<"Successfully inserted key: "<<k<<", value: "<<v<<std::endl;
         _elementCount++;
     }
 
@@ -152,10 +153,10 @@ bool SkipList<K,V>::searchElement(K k, V& v){
     }
     cur = cur->_forward[0];
     if(cur && cur->getKey()==k){
-        std::cout << "Found key: " << k << ", value: " << cur->getValue() << std::endl;
+        // std::cout << "Found key: " << k << ", value: " << cur->getValue() << std::endl;
         return true;
     }
-    std::cout << "Not Found Key:" << k << std::endl;
+    // std::cout << "Not Found Key:" << k << std::endl;
     return false;
 }
 
@@ -167,20 +168,20 @@ bool SkipList<K,V>::deleteElement(K k){
     mtx.lock();
     Node<K,V>* cur = _header;
     // track the parent
-    Node<K,V>* update = new Node<K,V>[_maxLevel+1];
+    Node<K,V>** update = new Node<K,V>*[_maxLevel+1];
     for(int i = _curLevel; i >= 0; i--){
         while(cur->_forward[i] && cur->_forward[i]->getKey()<k)
             cur = cur->_forward[i];
-        update[i] = *cur;
+        update[i] = cur;
     }
     cur = cur->_forward[0];
 
     // if find the key-element, delete
     if(cur && cur->getKey()==k){
         for(int i = 0; i <= _curLevel; i++){
-            if(update[i]._forward[i] != cur)
+            if(update[i]->_forward[i] != cur)
                 break;
-            update[i]._forward[i] = cur->_forward[i];
+            update[i]->_forward[i] = cur->_forward[i];
         }
         std::cout<<"Delete key: "<<k<<" value: "<<cur->getValue()<<std::endl;
         delete cur;
